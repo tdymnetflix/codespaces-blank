@@ -26,5 +26,7 @@ services:
     environment:
       HERMES_HOME: /opt/data
       HERMES_WRITE_SAFE_ROOT: /opt/data
+      HERMES_UID: ${UID:-1000}
+      HERMES_GID: ${GID:-1000}
     stdin_open: true
     tty: true
