@@ -1,0 +1,13 @@
+{
+  "source": "security-scan",
+  "source_url": "security-scan",
+  "bundle_hash": "sha256:a1fdf270dc8af5809c2c92f5020914e772e3646d2c6d57c583811fc68e19bd57",
+  "scanner_version": "skills-guard-v1",
+  "verdict": "safe",
+  "trust_level": "community",
+  "findings": [],
+  "rules": [],
+  "scanned_at": "2026-09-06T12:41:30.843668+00:00",
+  "summary": "security-scan: clean scan, no threats detected",
+  "fresh": true
+}
