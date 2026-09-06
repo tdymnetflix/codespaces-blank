@@ -20,6 +20,10 @@ The workflow in `.github/workflows/hermes.yml` runs when a trusted user opens an
 5. Commits changes using the GitHub Actions bot identity.
 6. Posts the result back to the Issue.
 
+Hermes memory is stored in `.hermes/memories/MEMORY.md` and
+`.hermes/memories/USER.md`. The workflow commits those files so memory survives
+the temporary GitHub runner.
+
 Runs are serialized per Issue so two comments cannot edit the repository simultaneously. Each run is limited to 30 minutes and 30 agent turns.
 
 ### Local WebUI

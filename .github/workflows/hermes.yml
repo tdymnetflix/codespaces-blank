@@ -86,7 +86,7 @@ jobs:
           set +e
           hermes -q "${prompt}" -Q \
             --model "${HERMES_MODEL}" \
-            --toolsets terminal \
+            --toolsets terminal,memory \
             --max-turns 30 2>&1 | tee hermes-output.txt
           status=${PIPESTATUS[0]}
           set -e
