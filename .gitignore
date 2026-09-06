@@ -1,3 +1,9 @@
 .env
-.hermes/
+.hermes/.env
+.hermes/auth.json
+.hermes/*token*
+.hermes/*secret*
+.hermes/*.log
+.hermes/logs/
+.hermes/cache/
 bin/cloudflared

@@ -46,6 +46,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           HERMES_MODEL: ${{ vars.HERMES_MODEL || 'openrouter/anthropic/claude-sonnet-4' }}
+          HERMES_HOME: ${{ github.workspace }}/.hermes
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_PATH: ${{ github.event_path }}
@@ -97,6 +98,21 @@ jobs:
             echo 'HERMES_RESULT'
           } >> "${GITHUB_OUTPUT}"
           exit "${status}"
+
+      - name: Persist Hermes home
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          git add .hermes
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git config user.name "hermes-agent[bot]"
+          git config user.email "hermes-agent[bot]@users.noreply.github.com"
+          git commit -m "chore: persist Hermes state"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Reply on the Issue
         if: always() && steps.hermes.outputs.result != ''

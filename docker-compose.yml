@@ -4,7 +4,7 @@ services:
     ports:
       - "${HERMES_WEBUI_BIND:-127.0.0.1}:8787:8787"
     volumes:
-      - ${HERMES_HOME:-${HOME}/.hermes}:/home/hermeswebui/.hermes
+      - ${HERMES_HOME:-${PWD}/.hermes}:/home/hermeswebui/.hermes
       - ${HERMES_WORKSPACE:-${PWD}}:/workspace
     environment:
       WANTED_UID: ${UID:-1000}
