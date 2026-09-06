@@ -15,3 +15,16 @@ services:
       HERMES_WEBUI_DEFAULT_WORKSPACE: /workspace
       HERMES_WEBUI_PASSWORD: ${HERMES_WEBUI_PASSWORD:-}
     restart: unless-stopped
+
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    profiles: [agent]
+    working_dir: /workspace
+    volumes:
+      - ${HERMES_HOME:-${PWD}/.hermes}:/opt/data
+      - ${HERMES_WORKSPACE:-${PWD}}:/workspace
+    environment:
+      HERMES_HOME: /opt/data
+      HERMES_WRITE_SAFE_ROOT: /opt/data
+    stdin_open: true
+    tty: true

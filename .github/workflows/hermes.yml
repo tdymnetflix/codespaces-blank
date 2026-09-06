@@ -38,8 +38,7 @@ jobs:
           version: latest
 
       - name: Install Hermes
-        run: uv tool install --python 3.12 git+https://github.com/NousResearch/hermes-agent.git
-
+        run: uv tool install hermes-agent
       - name: Configure Cloudflare proxy model
         env:
           HERMES_HOME: ${{ github.workspace }}/.hermes
