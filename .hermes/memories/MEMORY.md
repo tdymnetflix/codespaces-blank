@@ -1,0 +1,1 @@
+Hermes skills directory: .hermes/skills exists with .hub for skill management. Currently no external skill repositories tapped (taps.json empty) and no skills installed (lock.json shows empty installed section). 90,605 skills indexed in hermes-index.json from official NousResearch/hermes-agent repository and community sources.
