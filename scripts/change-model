@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+WORKSPACE="${WORKSPACE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+HERMES_HOME="${HERMES_HOME:-$WORKSPACE/.hermes}"
+PROXY_URL="${CF_PROXY_URL:-http://127.0.0.1:8788/v1}"
+PROXY_HOST="${CF_PROXY_HOST:-127.0.0.1}"
+PROXY_PORT="${CF_PROXY_PORT:-8788}"
+PROXY_PID_FILE="$HERMES_HOME/cf-proxy.pid"
+
+export HERMES_HOME
+
+proxy_is_ready() {
+  curl --fail --silent --max-time 2 "http://${PROXY_HOST}:${PROXY_PORT}/health" >/dev/null
+}
+
+stop_owned_proxy() {
+  if [[ -f "$PROXY_PID_FILE" ]]; then
+    pid="$(cat "$PROXY_PID_FILE")"
+    if [[ "$pid" =~ ^[0-9]+$ ]] && kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" || true
+      for _ in {1..20}; do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.1
+      done
+    fi
+    rm -f "$PROXY_PID_FILE"
+  fi
+}
+
+start_proxy() {
+  mkdir -p "$HERMES_HOME"
+  if proxy_is_ready; then
+    return
+  fi
+
+  python3 "$SCRIPT_DIR/cf-proxy.py" >"$HERMES_HOME/cf-proxy.log" 2>&1 &
+  proxy_pid=$!
+  echo "$proxy_pid" >"$PROXY_PID_FILE"
+
+  for _ in {1..30}; do
+    if proxy_is_ready; then
+      return
+    fi
+    if ! kill -0 "$proxy_pid" 2>/dev/null; then
+      cat "$HERMES_HOME/cf-proxy.log" >&2 || true
+      return 1
+    fi
+    sleep 0.2
+  done
+
+  echo "Cloudflare proxy did not become ready" >&2
+  return 1
+}
+
+start_proxy
+
+hermes config set model.provider custom
+hermes config set model.base_url "$PROXY_URL"
+hermes config set model.api_compat openai
+hermes config set model.default "${CF_MODEL:-@cf/zai-org/glm-4.7-flash}"
+hermes config set model.display_name "${CF_MODEL_DISPLAY_NAME:-cloudflare}"
+
+echo "Hermes model configured through Cloudflare proxy: $PROXY_URL"
+echo "Model: ${CF_MODEL:-@cf/zai-org/glm-4.7-flash}"

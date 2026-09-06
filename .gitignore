@@ -7,3 +7,4 @@
 .hermes/logs/
 .hermes/cache/
 bin/cloudflared
+credentials/cloudflare.txt

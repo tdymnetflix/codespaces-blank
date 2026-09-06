@@ -64,6 +64,26 @@ For development, `cloudflared` can forward the local WebUI to a temporary public
 
 The current generated URL is recorded in [CLOUDFLARE_TUNNEL_URL.md](CLOUDFLARE_TUNNEL_URL.md). Quick Tunnel URLs are public, unauthenticated, temporary, and stop working when `cloudflared` exits. Do not use this mode for production or sensitive work.
 
+## Cloudflare AI Proxy
+
+[`scripts/cf-proxy.py`](scripts/cf-proxy.py) is a localhost-only OpenAI-compatible proxy for Cloudflare Workers AI. It fetches the account list from the Bitbucket raw URL at startup, keeps credentials in memory, and rotates accounts when Cloudflare returns HTTP `429`:
+
+```bash
+python3 scripts/cf-proxy.py
+```
+
+Hermes can use `http://127.0.0.1:8788/v1` as an OpenAI-compatible base URL. Set `CF_CREDENTIALS_URL` to use another source. For a private Bitbucket source, provide `BITBUCKET_USERNAME` and `BITBUCKET_APP_PASSWORD` through the environment; never put them in the repository. The proxy does not save the downloaded credential file.
+
+The optional local fallback path `credentials/cloudflare.txt` is ignored by `.gitignore`. Do not expose port `8788` publicly.
+
+Run [`scripts/change-model`](scripts/change-model) to configure Hermes to use the proxy and the Cloudflare `@cf/zai-org/glm-4.7-flash` model:
+
+```bash
+bash scripts/change-model
+```
+
+This stores the model configuration under the repository-local `.hermes` home. Override `CF_MODEL` or `CF_PROXY_URL` when needed. The script leaves Hermes secret and PII redaction enabled.
+
 ## Repository Files
 
 | File | Purpose |
@@ -74,5 +94,7 @@ The current generated URL is recorded in [CLOUDFLARE_TUNNEL_URL.md](CLOUDFLARE_T
 | `.env.example` | Local Compose configuration template |
 | `AGENTS.md` | Instructions Hermes should follow while changing the repository |
 | `CLOUDFLARE_TUNNEL_URL.md` | Current temporary development URL |
+| `scripts/cf-proxy.py` | Local Cloudflare Workers AI proxy with 429 account rotation |
+| `scripts/change-model` | Configures Hermes to use the local Cloudflare proxy |
 
 Secrets, `.hermes` state, the local `cloudflared` binary, and `.env` are excluded by `.gitignore`.
