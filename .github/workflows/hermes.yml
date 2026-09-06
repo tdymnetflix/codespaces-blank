@@ -83,7 +83,7 @@ jobs:
           git config user.email "hermes-agent[bot]@users.noreply.github.com"
 
           set +e
-          hermes chat -z "${prompt}" \
+          hermes -z "${prompt}" chat \
             -t terminal,memory 2>&1 | tee hermes-output.txt
           status=${PIPESTATUS[0]}
           set -e
