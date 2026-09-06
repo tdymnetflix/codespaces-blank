@@ -83,9 +83,8 @@ jobs:
           git config user.email "hermes-agent[bot]@users.noreply.github.com"
 
           set +e
-          hermes -q "${prompt}" -Q \
-            --toolsets terminal,memory \
-            --max-turns 30 2>&1 | tee hermes-output.txt
+          hermes -z "${prompt}" \
+            -t terminal,memory 2>&1 | tee hermes-output.txt
           status=${PIPESTATUS[0]}
           set -e
 
