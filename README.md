@@ -32,10 +32,9 @@ The WebUI is a persistent Docker service, separate from GitHub Actions. `docker-
 
 ## GitHub Setup
 
-1. Add an `OPENROUTER_API_KEY` repository secret under **Settings -> Secrets and variables -> Actions**.
-2. Optionally add a repository variable called `HERMES_MODEL`. The default is `openrouter/anthropic/claude-sonnet-4`.
-3. Enable GitHub Actions.
-4. Open an Issue using the **Hermes task** template.
+1. Enable GitHub Actions.
+2. Optionally add a repository variable called `CF_MODEL`. The default is `@cf/zai-org/glm-4.7-flash`.
+3. Open an Issue using the **Hermes task** template.
 
 Only repository owners, members, and collaborators can trigger the workflow. The workflow grants `contents: write` and `issues: write`, allowing Hermes to commit and reply. Review generated commits and workflow logs before merging higher-risk changes.
 

@@ -40,23 +40,22 @@ jobs:
       - name: Install Hermes
         run: uv tool install --python 3.12 hermes-agent
 
+      - name: Configure Cloudflare proxy model
+        env:
+          HERMES_HOME: ${{ github.workspace }}/.hermes
+          CF_MODEL: ${{ vars.CF_MODEL || '@cf/zai-org/glm-4.7-flash' }}
+        run: bash scripts/change-model
+
       - name: Run Hermes
         id: hermes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          HERMES_MODEL: ${{ vars.HERMES_MODEL || 'openrouter/anthropic/claude-sonnet-4' }}
           HERMES_HOME: ${{ github.workspace }}/.hermes
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_PATH: ${{ github.event_path }}
         run: |
           set -euo pipefail
-
-          if [[ -z "${OPENROUTER_API_KEY}" ]]; then
-            echo "OPENROUTER_API_KEY is not configured." >&2
-            exit 1
-          fi
 
           issue_title="$(jq -r '.issue.title' "${EVENT_PATH}")"
           issue_body="$(jq -r '.issue.body // ""' "${EVENT_PATH}")"
@@ -85,7 +84,6 @@ jobs:
 
           set +e
           hermes -q "${prompt}" -Q \
-            --model "${HERMES_MODEL}" \
             --toolsets terminal,memory \
             --max-turns 30 2>&1 | tee hermes-output.txt
           status=${PIPESTATUS[0]}

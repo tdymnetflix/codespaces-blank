@@ -4,6 +4,7 @@
 .hermes/*token*
 .hermes/*secret*
 .hermes/*.log
+.hermes/*.pid
 .hermes/logs/
 .hermes/cache/
 bin/cloudflared
