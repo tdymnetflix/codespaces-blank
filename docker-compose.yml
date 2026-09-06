@@ -1,6 +1,8 @@
 services:
   hermes-webui:
     image: ghcr.io/nesquena/hermes-webui:latest
+    depends_on:
+      - hermes-agent
     ports:
       - "${HERMES_WEBUI_BIND:-127.0.0.1}:8787:8787"
     volumes:
@@ -14,11 +16,14 @@ services:
       HERMES_WEBUI_STATE_DIR: /home/hermeswebui/.hermes/webui
       HERMES_WEBUI_DEFAULT_WORKSPACE: /workspace
       HERMES_WEBUI_PASSWORD: ${HERMES_WEBUI_PASSWORD:-}
+      HERMES_WEBUI_CHAT_BACKEND: gateway
+      HERMES_WEBUI_GATEWAY_BASE_URL: http://hermes-agent:8642
+      HERMES_WEBUI_GATEWAY_API_KEY: ${API_SERVER_KEY:-}
+      HERMES_WEBUI_GATEWAY_USE_RUNS_API: "true"
     restart: unless-stopped
 
   hermes-agent:
     image: nousresearch/hermes-agent:latest
-    profiles: [agent]
     working_dir: /workspace
     volumes:
       - ${HERMES_HOME:-${PWD}/.hermes}:/opt/data
@@ -28,5 +33,7 @@ services:
       HERMES_WRITE_SAFE_ROOT: /opt/data
       HERMES_UID: ${UID:-1000}
       HERMES_GID: ${GID:-1000}
-    stdin_open: true
-    tty: true
+      API_SERVER_HOST: 0.0.0.0
+      API_SERVER_KEY: ${API_SERVER_KEY:-}
+    command: ["gateway", "run"]
+    restart: unless-stopped
