@@ -13,6 +13,7 @@ concurrency:
 permissions:
   contents: write
   issues: write
+  packages: read
 
 jobs:
   run:
@@ -29,6 +30,7 @@ jobs:
       HERMES_HOME: ${{ github.workspace }}/.hermes
       HERMES_WORKSPACE: ${{ github.workspace }}
       CF_MODEL: ${{ vars.CF_MODEL || '@cf/zai-org/glm-4.7-flash' }}
+      HERMES_IMAGE: ghcr.io/${{ github.repository_owner }}/codespaces-blank:latest
 
     steps:
       - name: Check out repository
@@ -43,6 +45,9 @@ jobs:
         run: |
           set -euo pipefail
           printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env
+          printf '%s' "${GITHUB_TOKEN}" |
+            docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+          docker compose pull cf-proxy hermes-agent
           docker compose up -d cf-proxy hermes-agent
           docker compose ps
 

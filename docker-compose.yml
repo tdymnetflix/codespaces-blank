@@ -1,15 +1,14 @@
 services:
   cf-proxy:
-    image: nousresearch/hermes-agent:latest
+    image: ${HERMES_IMAGE:-ghcr.io/tdymnetflix/codespaces-blank:latest}
     working_dir: /app
     entrypoint: ["python3"]
-    volumes:
-      - ./scripts/cf-proxy.py:/app/cf-proxy.py:ro
+    volumes: []
     environment:
       CF_PROXY_HOST: 0.0.0.0
       CF_PROXY_PORT: 8788
       CF_MODEL: ${CF_MODEL:-@cf/zai-org/glm-4.7-flash}
-    command: ["/app/cf-proxy.py"]
+    command: ["/opt/hermes/cf-proxy.py"]
     expose:
       - "8788"
     healthcheck:
@@ -20,7 +19,7 @@ services:
     restart: unless-stopped
 
   hermes-webui:
-    image: ghcr.io/nesquena/hermes-webui:latest
+    image: ${HERMES_IMAGE:-ghcr.io/tdymnetflix/codespaces-blank:latest}
     depends_on:
       hermes-agent:
         condition: service_started
@@ -46,7 +45,7 @@ services:
     restart: unless-stopped
 
   hermes-agent:
-    image: nousresearch/hermes-agent:latest
+    image: ${HERMES_IMAGE:-ghcr.io/tdymnetflix/codespaces-blank:latest}
     depends_on:
       cf-proxy:
         condition: service_healthy
