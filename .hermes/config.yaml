@@ -1,6 +1,6 @@
 model:
   provider: custom
-  base_url: http://127.0.0.1:8788/v1
+  base_url: http://cf-proxy:8788/v1
   api_compat: openai
   default: '@cf/zai-org/glm-4.7-flash'
   display_name: cloudflare

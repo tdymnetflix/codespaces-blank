@@ -24,6 +24,7 @@ LISTEN_PORT = int(os.environ.get("CF_PROXY_PORT", "8788"))
 MAX_RETRIES = int(os.environ.get("CF_MAX_RETRIES", "20"))
 CREDENTIALS_TIMEOUT = int(os.environ.get("CF_CREDENTIALS_TIMEOUT", "15"))
 ACCOUNT_TTL = 15
+MODEL_NAME = os.environ.get("CF_MODEL", "@cf/zai-org/glm-4.7-flash")
 
 
 def load_accounts():
@@ -93,6 +94,24 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
             self.send_body(200, json.dumps({"ok": True, "accounts": len(ACCOUNTS)}))
+            return
+        if self.path in {"/v1/models", "/models"}:
+            self.send_body(
+                200,
+                json.dumps(
+                    {
+                        "object": "list",
+                        "data": [
+                            {
+                                "id": MODEL_NAME,
+                                "object": "model",
+                                "owned_by": "cloudflare",
+                            }
+                        ],
+                    }
+                ),
+                {"Content-Type": "application/json"},
+            )
             return
         self.send_body(404, b"")
 

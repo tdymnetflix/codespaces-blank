@@ -1,8 +1,30 @@
 services:
+  cf-proxy:
+    image: python:3.13-slim
+    working_dir: /app
+    volumes:
+      - ./scripts/cf-proxy.py:/app/cf-proxy.py:ro
+    environment:
+      CF_PROXY_HOST: 0.0.0.0
+      CF_PROXY_PORT: 8788
+      CF_MODEL: ${CF_MODEL:-@cf/zai-org/glm-4.7-flash}
+    command: ["python3", "/app/cf-proxy.py"]
+    expose:
+      - "8788"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8788/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   hermes-webui:
     image: ghcr.io/nesquena/hermes-webui:latest
     depends_on:
-      - hermes-agent
+      hermes-agent:
+        condition: service_started
+      cf-proxy:
+        condition: service_healthy
     ports:
       - "${HERMES_WEBUI_BIND:-127.0.0.1}:8787:8787"
     volumes:
@@ -24,6 +46,9 @@ services:
 
   hermes-agent:
     image: nousresearch/hermes-agent:latest
+    depends_on:
+      cf-proxy:
+        condition: service_healthy
     working_dir: /workspace
     volumes:
       - ${HERMES_HOME:-${PWD}/.hermes}:/opt/data
