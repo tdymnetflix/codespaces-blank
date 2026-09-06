@@ -1,4 +1,4 @@
-name: Hermes Agent
+name: Hermes Agent (Docker)
 
 on:
   issues:
@@ -7,7 +7,7 @@ on:
     types: [created]
 
 concurrency:
-  group: hermes-issue-${{ github.event.issue.number }}
+  group: hermes-docker-issue-${{ github.event.issue.number }}
   cancel-in-progress: false
 
 permissions:
@@ -24,6 +24,11 @@ jobs:
       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      COMPOSE_PROJECT_NAME: hermes-${{ github.run_id }}
+      HERMES_HOME: ${{ github.workspace }}/.hermes
+      HERMES_WORKSPACE: ${{ github.workspace }}
+      CF_MODEL: ${{ vars.CF_MODEL || '@cf/zai-org/glm-4.7-flash' }}
 
     steps:
       - name: Check out repository
@@ -32,27 +37,29 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install Hermes Agent
-        uses: astral-sh/setup-uv@v6
-        with:
-          version: latest
-
-      - name: Install Hermes
-        run: uv tool install hermes-agent
-      - name: Configure Cloudflare proxy model
+      - name: Start Hermes Docker services
         env:
-          HERMES_HOME: ${{ github.workspace }}/.hermes
-          CF_MODEL: ${{ vars.CF_MODEL || '@cf/zai-org/glm-4.7-flash' }}
-        run: bash scripts/change-model
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env
+          docker compose up -d cf-proxy hermes-agent
+          docker compose ps
 
-      - name: Run Hermes
+      - name: Verify Cloudflare proxy
+        run: |
+          set -euo pipefail
+          docker compose exec -T cf-proxy python3 -c \
+            'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8788/health")'
+          docker compose exec -T cf-proxy python3 -c \
+            'import urllib.request; response = urllib.request.urlopen("http://127.0.0.1:8788/v1/models"); print(response.read().decode())'
+
+      - name: Run Hermes in Docker
         id: hermes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HERMES_HOME: ${{ github.workspace }}/.hermes
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          EVENT_NAME: ${{ github.event_name }}
           EVENT_PATH: ${{ github.event_path }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           set -euo pipefail
 
@@ -78,11 +85,10 @@ jobs:
             'outside this repository. Commit useful changes with a concise message. Finish with a' \
             'short summary of changes, tests run, and any remaining limitation for the Issue reply.')
 
-          git config user.name "hermes-agent[bot]"
-          git config user.email "hermes-agent[bot]@users.noreply.github.com"
-
           set +e
-          hermes -z "${prompt}" chat \
+          docker compose exec -T \
+            -e GITHUB_TOKEN \
+            hermes-agent hermes -z "${prompt}" chat \
             -t terminal,memory 2>&1 | tee hermes-output.txt
           status=${PIPESTATUS[0]}
           set -e
@@ -97,8 +103,6 @@ jobs:
 
       - name: Persist Hermes home
         if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           git add .hermes
@@ -117,5 +121,9 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           RESULT: ${{ steps.hermes.outputs.result }}
         run: |
-          printf '## Hermes Agent\n\n\\`\\`\\`\n%s\n\\`\\`\\`\n' "${RESULT}" |
+          printf '## Hermes Agent (Docker)\n\n\\`\\`\\`\n%s\n\\`\\`\\`\n' "${RESULT}" |
             gh issue comment "${ISSUE_NUMBER}" --body-file -
+
+      - name: Stop Hermes Docker services
+        if: always()
+        run: docker compose down --volumes
