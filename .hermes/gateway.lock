@@ -1,1 +1,1 @@
-{"pid": 159, "kind": "hermes-gateway", "argv": ["/opt/hermes/.venv/bin/hermes", "gateway", "run", "--replace"], "start_time": 445369, "hermes_home": "/opt/data"}
+{"pid": 172, "kind": "hermes-gateway", "argv": ["/opt/hermes/.venv/bin/hermes", "gateway", "run", "--replace"], "start_time": 15391, "hermes_home": "/opt/data"}
