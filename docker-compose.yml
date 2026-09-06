@@ -1,0 +1,17 @@
+services:
+  hermes-webui:
+    image: ghcr.io/nesquena/hermes-webui:latest
+    ports:
+      - "${HERMES_WEBUI_BIND:-127.0.0.1}:8787:8787"
+    volumes:
+      - ${HERMES_HOME:-${HOME}/.hermes}:/home/hermeswebui/.hermes
+      - ${HERMES_WORKSPACE:-${PWD}}:/workspace
+    environment:
+      WANTED_UID: ${UID:-1000}
+      WANTED_GID: ${GID:-1000}
+      HERMES_WEBUI_HOST: 0.0.0.0
+      HERMES_WEBUI_PORT: 8787
+      HERMES_WEBUI_STATE_DIR: /home/hermeswebui/.hermes/webui
+      HERMES_WEBUI_DEFAULT_WORKSPACE: /workspace
+      HERMES_WEBUI_PASSWORD: ${HERMES_WEBUI_PASSWORD:-}
+    restart: unless-stopped

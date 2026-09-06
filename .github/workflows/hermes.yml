@@ -1,0 +1,109 @@
+name: Hermes Agent
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: hermes-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  run:
+    if: >-
+      (github.event_name == 'issues' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association)) ||
+      (github.event_name == 'issue_comment' &&
+      github.event.comment.user.login != 'github-actions[bot]' &&
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Hermes Agent
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+
+      - name: Install Hermes
+        run: uv tool install --python 3.12 hermes-agent
+
+      - name: Run Hermes
+        id: hermes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          HERMES_MODEL: ${{ vars.HERMES_MODEL || 'openrouter/anthropic/claude-sonnet-4' }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PATH: ${{ github.event_path }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${OPENROUTER_API_KEY}" ]]; then
+            echo "OPENROUTER_API_KEY is not configured." >&2
+            exit 1
+          fi
+
+          issue_title="$(jq -r '.issue.title' "${EVENT_PATH}")"
+          issue_body="$(jq -r '.issue.body // ""' "${EVENT_PATH}")"
+          comment_body="$(jq -r '.comment.body // ""' "${EVENT_PATH}")"
+
+          prompt=$(printf '%s\n' \
+            'You are Hermes Agent operating in a GitHub repository through a trusted Issue.' \
+            '' \
+            "Repository: ${GITHUB_REPOSITORY}" \
+            "Issue: #${ISSUE_NUMBER}" \
+            "Title: ${issue_title}" \
+            'Original issue body:' \
+            "${issue_body}" \
+            '' \
+            'Latest comment (empty when this is a newly opened issue):' \
+            "${comment_body}" \
+            '' \
+            'Work directly in the checked-out repository. Inspect the existing code before editing.' \
+            'Implement the requested change when it is clear and safe. Run the narrowest relevant' \
+            'tests or checks. Do not expose secrets, change workflow permissions, or modify files' \
+            'outside this repository. Commit useful changes with a concise message. Finish with a' \
+            'short summary of changes, tests run, and any remaining limitation for the Issue reply.')
+
+          git config user.name "hermes-agent[bot]"
+          git config user.email "hermes-agent[bot]@users.noreply.github.com"
+
+          set +e
+          hermes -q "${prompt}" -Q \
+            --model "${HERMES_MODEL}" \
+            --toolsets terminal \
+            --max-turns 30 2>&1 | tee hermes-output.txt
+          status=${PIPESTATUS[0]}
+          set -e
+
+          {
+            echo 'result<<HERMES_RESULT'
+            tail -c 60000 hermes-output.txt
+            echo
+            echo 'HERMES_RESULT'
+          } >> "${GITHUB_OUTPUT}"
+          exit "${status}"
+
+      - name: Reply on the Issue
+        if: always() && steps.hermes.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          RESULT: ${{ steps.hermes.outputs.result }}
+        run: |
+          printf '## Hermes Agent\n\n\\`\\`\\`\n%s\n\\`\\`\\`\n' "${RESULT}" |
+            gh issue comment "${ISSUE_NUMBER}" --body-file -
