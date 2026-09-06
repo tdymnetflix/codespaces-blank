@@ -89,6 +89,7 @@ jobs:
           docker compose exec -T \
             -e GITHUB_TOKEN \
             hermes-agent hermes -z "${prompt}" chat \
+            --in /workspace --no-restore-cwd \
             -t terminal,memory 2>&1 | tee hermes-output.txt
           status=${PIPESTATUS[0]}
           set -e
