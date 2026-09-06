@@ -26,11 +26,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      COMPOSE_PROJECT_NAME: hermes-${{ github.run_id }}
       HERMES_HOME: ${{ github.workspace }}/.hermes
       HERMES_WORKSPACE: ${{ github.workspace }}
       CF_MODEL: ${{ vars.CF_MODEL || '@cf/zai-org/glm-4.7-flash' }}
       HERMES_IMAGE: ghcr.io/${{ github.repository_owner }}/codespaces-blank:latest
+      HERMES_NETWORK: hermes-${{ github.run_id }}
+      HERMES_PROXY_CONTAINER: hermes-proxy-${{ github.run_id }}
+      HERMES_AGENT_CONTAINER: hermes-agent-${{ github.run_id }}
+      HERMES_WEBUI_CONTAINER: hermes-webui-${{ github.run_id }}
 
     steps:
       - name: Check out repository
@@ -45,18 +48,58 @@ jobs:
         run: |
           set -euo pipefail
           printf 'UID=%s\nGID=%s\n' "$(id -u)" "$(id -g)" > .env
+          printf 'API_SERVER_KEY=%s\n' "$(openssl rand -hex 24)" >> "${GITHUB_ENV}"
           printf '%s' "${GITHUB_TOKEN}" |
             docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
-          docker compose pull cf-proxy hermes-agent
-          docker compose up -d cf-proxy hermes-agent
-          docker compose ps
+          docker pull "${HERMES_IMAGE}"
+          docker network create "${HERMES_NETWORK}"
+          docker run -d --name "${HERMES_PROXY_CONTAINER}" \
+            --network "${HERMES_NETWORK}" \
+            --entrypoint python3 \
+            -e CF_PROXY_HOST=0.0.0.0 \
+            -e CF_PROXY_PORT=8788 \
+            -e CF_MODEL \
+            "${HERMES_IMAGE}" /opt/hermes/cf-proxy.py
+          docker run -d --name "${HERMES_AGENT_CONTAINER}" \
+            --network "${HERMES_NETWORK}" \
+            -w /workspace \
+            -v "${HERMES_HOME}:/opt/data" \
+            -v "${HERMES_WORKSPACE}:/workspace" \
+            -e HERMES_HOME=/opt/data \
+            -e HERMES_WRITE_SAFE_ROOT=/opt/data \
+            -e HERMES_UID="$(id -u)" \
+            -e HERMES_GID="$(id -g)" \
+            -e API_SERVER_HOST=0.0.0.0 \
+            -e API_SERVER_KEY="${API_SERVER_KEY:-}" \
+            "${HERMES_IMAGE}" gateway run
+          docker run -d --name "${HERMES_WEBUI_CONTAINER}" \
+            --network "${HERMES_NETWORK}" \
+            -v "${HERMES_HOME}:/home/hermeswebui/.hermes" \
+            -v "${HERMES_WORKSPACE}:/workspace" \
+            -e WANTED_UID="$(id -u)" \
+            -e WANTED_GID="$(id -g)" \
+            -e HERMES_WEBUI_HOST=0.0.0.0 \
+            -e HERMES_WEBUI_PORT=8787 \
+            -e HERMES_WEBUI_STATE_DIR=/home/hermeswebui/.hermes/webui \
+            -e HERMES_WEBUI_DEFAULT_WORKSPACE=/workspace \
+            -e HERMES_WEBUI_CHAT_BACKEND=gateway \
+            -e HERMES_WEBUI_GATEWAY_BASE_URL=http://${HERMES_AGENT_CONTAINER}:8642 \
+            -e HERMES_WEBUI_GATEWAY_API_KEY="${API_SERVER_KEY:-}" \
+            -e HERMES_WEBUI_GATEWAY_USE_RUNS_API=true \
+            "${HERMES_IMAGE}"
 
       - name: Verify Cloudflare proxy
         run: |
           set -euo pipefail
-          docker compose exec -T cf-proxy python3 -c \
-            'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8788/health")'
-          docker compose exec -T cf-proxy python3 -c \
+          for attempt in {1..30}; do
+            if docker exec "${HERMES_PROXY_CONTAINER}" python3 -c \
+              'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8788/health")'; then
+              break
+            fi
+            [[ "${attempt}" == 30 ]] && exit 1
+            sleep 1
+          done
+          docker exec "${HERMES_PROXY_CONTAINER}" python3 -c \
             'import urllib.request; response = urllib.request.urlopen("http://127.0.0.1:8788/v1/models"); print(response.read().decode())'
 
       - name: Run Hermes in Docker
@@ -91,9 +134,8 @@ jobs:
             'short summary of changes, tests run, and any remaining limitation for the Issue reply.')
 
           set +e
-          docker compose exec -T \
-            -e GITHUB_TOKEN \
-            hermes-agent hermes -z "${prompt}" chat \
+          docker exec -e GITHUB_TOKEN "${HERMES_AGENT_CONTAINER}" \
+            hermes -z "${prompt}" chat \
             --in /workspace --no-restore-cwd \
             -t terminal,memory 2>&1 | tee hermes-output.txt
           status=${PIPESTATUS[0]}
@@ -132,4 +174,6 @@ jobs:
 
       - name: Stop Hermes Docker services
         if: always()
-        run: docker compose down --volumes
+        run: |
+          docker rm -f "${HERMES_WEBUI_CONTAINER}" "${HERMES_AGENT_CONTAINER}" "${HERMES_PROXY_CONTAINER}" 2>/dev/null || true
+          docker network rm "${HERMES_NETWORK}" 2>/dev/null || true
