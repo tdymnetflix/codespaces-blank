@@ -1,14 +1,15 @@
 services:
   cf-proxy:
-    image: python:3.13-slim
+    image: nousresearch/hermes-agent:latest
     working_dir: /app
+    entrypoint: ["python3"]
     volumes:
       - ./scripts/cf-proxy.py:/app/cf-proxy.py:ro
     environment:
       CF_PROXY_HOST: 0.0.0.0
       CF_PROXY_PORT: 8788
       CF_MODEL: ${CF_MODEL:-@cf/zai-org/glm-4.7-flash}
-    command: ["python3", "/app/cf-proxy.py"]
+    command: ["/app/cf-proxy.py"]
     expose:
       - "8788"
     healthcheck:
